@@ -1,59 +1,129 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>More-than-human Derive | prototype1</title>
-  <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
-  <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
-  <link rel="shortcut icon" href="https://carto.com/favicon.ico" />
-  <style>
-    html, body, #map {
-      height: 100%;
-      padding: 0;
-      margin: 0;
-    }
-  </style>
 
-  <link rel="stylesheet" href="https://libs.cartocdn.com/cartodb.js/v3/3.15/themes/css/cartodb.css" />
+<head>
+  <title>More-than-human | CARTO.JS</title>
+  <meta name="viewport" content="initial-scale=1.0">
+  <meta charset="utf-8">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:400,600,700|Open+Sans:300,400,600" rel="stylesheet">
+  <!-- Include Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js"></script>
+  <link href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css" rel="stylesheet">
+  <!-- Include CARTO.js -->
+  <script src="https://libs.cartocdn.com/carto.js/v4.2.0/carto.min.js"></script>
+  <link href="https://carto.com/developers/carto-js/examples/maps/public/style.css" rel="stylesheet">
 </head>
+
 <body>
+  <!-- Div for the map -->
   <div id="map"></div>
 
-  <!-- include cartodb.js library -->
-  <script src="https://libs.cartocdn.com/cartodb.js/v3/3.15/cartodb.js"></script>
+  <!-- Div for the textbox -->
+  <aside class="toolbox">
+    <div class="box">
+      <header>
+        <h1>More-than-human d&eacute;rive</h1>
+      </header>
+      <section>
+        <p class="description open-sans">CURRENT MAP DEVELOPMENT STATUS: <br />Red dots: CoM tree dataset; <br />Green
+          dots: sample csv
+          dataset for stories; <br />Blue dots: sample csv dataset for 'whisper to' locations.</p>
+        <p class="description open-sans">NEXT TASKS:
+        <ul>
+          <li>disable auto-aggregate</li>
+          <li>draw whisper lines</li>
+          <li>add popups to comtrees layer</li>
+          <li>add widgets: reset, full screen, search</li>
+          <li>add button to autopopulate WPForm with treeID and lon/lat in the_geom format</li>
+        </ul>
+        </p>
+      </section>
+      <footer class="js-footer"></footer>
+    </div>
+  </aside>
 
   <script>
-    function main() {
-      cartodb.createVis('map', 'https://documentation.cartodb.com/api/v2/viz/2b13c956-e7c1-11e2-806b-5404a6a683d5/viz.json', {
-          shareable: true,
-          title: true,
-          description: true,
-          search: true,
-          tiles_loader: true,
-          center_lat: -37.801,
-          center_lon: 144.964,
-          zoom: 15
-      })
-      .done(function(vis, layers) {
-        // layer 0 is the base layer, layer 1 is cartodb layer
-        // setInteraction is disabled by default
-        layers[1].setInteraction(true);
-        layers[1].on('featureOver', function(e, latlng, pos, data) {
-          cartodb.log.log(e, latlng, pos, data);
-        });
+    const map = L.map('map').setView([-37.8, 144.95], 12);
+    // map.scrollWheelZoom.disable();
 
-        // you can get the native map to work with it
-        var map = vis.getNativeMap();
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png', {
+      maxZoom: 18
+    }).addTo(map);
 
-        // now, perform any operations you need
-        // map.setZoom(3);
-        // map.panTo([50.5, 30.5]);
-      })
-      .error(function(err) {
-        console.log(err);
+    const client = new carto.Client({
+      apiKey: 'default_public',
+      username: 'helenwalpole'
+    });
+
+    // add the trees layer
+    const treesSource = new carto.source.SQL(`
+        SELECT *
+          FROM comtrees
+      `);
+    const treesStyle = new carto.style.CartoCSS(`
+        #layer {
+          marker-width: 5;
+          marker-fill: #EE4D5A;
+          marker-line-color: #FFFFFF;
+        }
+      `);
+    const treesLayer = new carto.layer.Layer(treesSource, treesStyle);
+
+    // add the stories layer
+    const storiesSource = new carto.source.Dataset('sampleformdatabaselatlon'); //loaded as dataset instead of SQL query
+    const storiesStyle = new carto.style.CartoCSS(`
+        #layer {
+          marker-width: 17;
+          marker-fill: #009739;
+          marker-line-color: #FFFFFF;
+        }
+      `);
+    const storiesLayer = new carto.layer.Layer(storiesSource, storiesStyle);
+
+    // add the whispers layer 
+    const whispersSource = new carto.source.Dataset('samplewhispersdatabaselatlon');
+    const whispersStyle = new carto.style.CartoCSS(`
+        #layer {
+          marker-width: 17;
+          marker-fill: #4287f5;
+          marker-line-color: #FFFFFF;
+        }
+      `);
+    const whispersLayer = new carto.layer.Layer(whispersSource, whispersStyle);
+
+    // add the lines layer linking stories to whispers
+    // const linesSourceSQL = new carto.source.SQL(`
+    //   SELECT a.cartodb_id,
+    //     ST_MakeLine(
+    //        a.the_geom,
+    //        b.the_geom,
+    //        4326
+    //     ) as the_geom,        
+    //   FROM sampleformdatabaselatlon as a,
+    //     samplewhispersdatabaselatlon as b
+    //   WHERE a.entry_id = b.entry_id
+    //    `);
+
+    // const linesStyle = new carto.style.CartoCSS(`
+    //     #layer {
+    //       line-width: 1.5;
+    //       line-color: #4CC8A3;
+    //       line-opacity: 1;
+    //     }
+    // `);
+    // const linesLayer = new carto.layer.Layer(linesSource, linesStyle)
+
+
+    // load all layers to the client
+    client.addLayers([storiesLayer, treesLayer, whispersLayer])
+      .then(() => {
+        console.log('Layers added!');
       });
-    }
 
-    window.onload = main;
+    // render layers on the map
+    client.getLeafletLayer().addTo(map);
+
   </script>
 </body>
+
 </html>
